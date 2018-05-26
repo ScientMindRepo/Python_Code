@@ -397,7 +397,7 @@ pygame.display.flip()    # Refreshes the screen display loading to show all GUI
 # LOOP 1: User selects a SEED configuration of live cells by clicking on grid
 while not done:
 
-    # For every event performed by user( egmouse click, keyboard press etc.)
+    # Listen for user performed events ( eg. mouse click, keyboard press etc.)
     for event in pygame.event.get():
 
         # CHECKS IF user wants to quit

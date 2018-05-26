@@ -1,0 +1,471 @@
+# written by Valentin Uzunov
+
+import pygame
+from customrectangle import CustomRect
+
+pygame.init()    # Initialize pygame engine
+
+# (R,G,B) colors alpha 0<a<1 option (R,G,B,a)
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+GREEN = (0, 155, 0)
+RED = (255, 0, 0)
+BLUE = (0, 0, 155)
+
+# GRID & CELL ATTRIBUTES
+ROWS = 20    # number of grid rows
+COLS = 40    # number of grid rows
+
+CELL_WIDTH = 25    # px
+CELL_HEIGHT = 25    # px
+MARGIN = 1    # px space between cells of the grid
+DEFAULT_CELL_COLOR = WHITE    # default cell background color for dead
+
+GRID_WIDTH = COLS * CELL_WIDTH + (COLS * MARGIN)    # Sets the window width based on # columns in grid
+GRID_HEIGHT = ROWS * CELL_HEIGHT + (ROWS * MARGIN)    # Sets the window height based on # row in grid
+
+
+# APP WINDOW PROPERTIES
+CONTROLS_NAV_REGION_WIDTH = 150    # px
+WINDOW_HEIGHT_EXT = 10    # px
+WINDOW_WIDTH = GRID_WIDTH + CONTROLS_NAV_REGION_WIDTH    # extends window width by the regions width
+WINDOW_HEIGHT = GRID_HEIGHT + WINDOW_HEIGHT_EXT    # extends the window height
+WINDOW_SIZE = [WINDOW_WIDTH, WINDOW_HEIGHT]    # used to pass and access the window size in px, with topleft=(x,y)=(0,0)
+
+screen = pygame.display.set_mode(WINDOW_SIZE)    # creates the window of the appropriate window size
+screen.fill(BLACK)    # Sets window background to black
+pygame.display.set_caption("Game of Life Sim")    # Set window title
+
+
+# RUN BUTTON ATTRIBUTES
+run_btn_width = 75    # px
+run_btn_height = 25    # px
+off_set_x = 25    # used in positioning x topleft coordinate of the run button relative to the window
+off_set_y = 50    # used in positioning y topleft coordinate of the run button relative to the window
+run_btn_x = ((MARGIN + CELL_WIDTH) * COLS) + off_set_x    # run button top left x coordinate
+run_btn_y = WINDOW_HEIGHT - off_set_y    # run button top left y coordinate
+
+
+# UTILITY METHOD to convert from window (x, y) to matrix (row, column)
+def find_on_grid(window_x, window_y):
+
+    # CHECK if one or both values need conversion
+    if window_x is None or window_y is None:
+
+        # Returns row index
+        if window_x is None:
+            grid_row_index = window_y // (CELL_HEIGHT + MARGIN)
+            return grid_row_index
+
+        # Returns column index
+        else:
+            grid_column_index = window_x // (CELL_WIDTH + MARGIN)
+            return grid_column_index
+
+    # Return both value
+    else:
+
+        grid_column_index = window_x // (CELL_WIDTH + MARGIN)
+        grid_row_index = window_y // (CELL_HEIGHT + MARGIN)
+
+        return grid_row_index, grid_column_index
+        # // 'floor division' returns the whole number adjusted to the left in the number line
+
+
+# UTILITY METHOD that we pass a grid_cell and it returns a list surrounding cells
+def find_surrounding_cells(parent_cell):
+
+    list_of_cells = []    # used to holds
+
+    # Get seed cell grid indices
+    parent_cell_row = find_on_grid(None, parent_cell.y)
+    parent_cell_column = find_on_grid(parent_cell.x, None)
+
+    # print('FINDING SURROUNDING CELLS TO SEED {},{}'.format(parent_cell_row,parent_cell_column))
+
+    # Define the the neighbor cells locations (columns of 'surrounding cells' matrix)
+    top_left = [parent_cell_row - 1, parent_cell_column - 1]
+    top_mid = [parent_cell_row - 1, parent_cell_column]
+    top_right = [parent_cell_row - 1, parent_cell_column + 1]
+    left_mid = [parent_cell_row, parent_cell_column - 1]
+    right_mid = [parent_cell_row, parent_cell_column + 1]
+    bottom_left = [parent_cell_row + 1, parent_cell_column - 1]
+    bottom_mid = [parent_cell_row + 1, parent_cell_column]
+    bottom_right = [parent_cell_row + 1, parent_cell_column + 1]
+
+    # 2D ListArray of surrounding neighbor cell locations relative to parent_cell seed
+    surrounding_cells = [top_left, top_mid, top_right, left_mid, right_mid, bottom_left, bottom_mid, bottom_right]
+
+    # Check that surrounding cells are within matrix bounds
+    for cell_xy in surrounding_cells:
+
+        row_i = cell_xy[0]
+        column_j = cell_xy[1]
+
+        surrounding_cell = grid[row_i][column_j]    # returns CustomRect object at specified grid location
+
+        # print('SURROUNDING CELL {},{}'.format(row_index, column_index))
+
+        # IF surrounding cell is inside the grid
+        if (row_i >= 0 and row_i < ROWS) and (column_j >= 0 and column_j < COLS):
+            list_of_cells.append(surrounding_cell)
+        else:
+            pass
+            # print('Neighbor cell AT {},{} ADDED to list of cells that SURROUND SEED {},{}'.format(cell_xy[0], cell_xy[1],parent_cell_column,parent_cell_row))
+
+    # print('REMOVING DUPLICATE ENTRIES')
+    # Remove duplicate entries
+    sorted_list = [x for i, x in enumerate(list_of_cells) if i == list_of_cells.index(x)]
+
+    return sorted_list
+
+
+# CREATES a ROW x COL matrix 'grid' of CustomRec objects  !! the grid cell ID grid_matrix[row][column]
+def init_board():
+
+    grid_matrix = []    # a list that will contain a list of rows[] populated with column values
+
+    # for ith row
+    for i in range(ROWS):
+
+        grid_matrix.append([])    # add an empty row list
+
+        # and j columns in each row
+        for j in range(COLS):
+
+            # at this coordinate location on the window
+            coord_location = [(MARGIN + CELL_WIDTH) * j + MARGIN, (MARGIN + CELL_HEIGHT) * i + MARGIN]
+
+            # with rectangular bounds
+            size = pygame.Rect((MARGIN + CELL_WIDTH) * j + MARGIN,    # size.x
+                               (MARGIN + CELL_HEIGHT) * i + MARGIN,    # size.y
+                               CELL_WIDTH,    # size.w
+                               CELL_HEIGHT    # size.h
+                               )
+
+            # initialize a CustomRect object of 'size' and color for each grid 'cell'
+            grid_cell = CustomRect(size, DEFAULT_CELL_COLOR)
+
+            # draw the rectangle surface to window at set location of grid cell
+            grid_cell.draw_custom_rect(coord_location, surface=screen)
+
+            # retrieve the grid_cell id, '(column, row)'
+
+            column = str(find_on_grid(grid_cell.id[0], None))
+            row = str(find_on_grid(grid_cell.id[1], None))
+            grid_cell_id = '{},{}'.format(row, column)
+
+            # (optional) add a label in top left corner of the grid cell
+            grid_cell.set_surface_label(size, font_size=7, text=grid_cell_id, surface=screen)
+
+            grid_matrix[i].append(grid_cell)  # for each grid cell in row append to row list
+
+    # grid_matrix[row][column]
+    return grid_matrix
+
+
+# GUI ELEMENT - CUSTOM BUTTON
+def draw_run_button(x, y, width, height, text):
+
+    bounds = pygame.Rect(x, y, width, height)
+    r = CustomRect(bounds, DEFAULT_CELL_COLOR)
+    r.draw_custom_rect((x, y), surface=screen)
+    r.set_surface_label(bounds, text=text, surface=screen)
+
+    return r
+
+
+# WRAPPER for all GUI loading
+def setup_interface():
+    draw_run_button(run_btn_x, run_btn_y, run_btn_width, run_btn_height, 'RUN')
+
+
+# RETURNS list of dead cells adjacent to cells in seed list
+def get_dead_cells_list():
+
+    # for each seed cell
+    for seed in seed_cell_list_current_turn:
+
+        dead_neighbors = 0  # to track the number of dead cells to seed cell
+
+        seed_row = find_on_grid(None, seed.y)    # returns the row index of the seed cell
+        seed_column = find_on_grid(seed.x, None)    # returns the column index of the seed cell
+
+        surrounding_cells_list = find_surrounding_cells(seed)    # returns list of surrounding CustomRect cells
+
+        print('FOR SEED CELL {},{}'.format(seed_row, seed_column))
+
+        # CHECK state of each surrounding cell
+        for cell_xy in surrounding_cells_list:
+
+            row = find_on_grid(None, cell_xy.y)
+            column = find_on_grid(cell_xy.x, None)
+
+            surrounding_cell = grid[row][column]    # Returns CustomRect of surrounding cell on grid
+
+            # print('SURROUNDING CELL {},{}'.format(row, column))
+
+            # IF cell is dead
+            if surrounding_cell.get_state() == 0:
+
+                dead_neighbors += 1    # Add to tally
+
+                dead_cell_list.append(surrounding_cell)    # Add cell to list of dead cells with <= 1 live neighbor
+
+                # print('STATE = "DEAD" , ADDED TO dead_neighbors list')
+
+        # Remove any duplicate entries from the list of dead cells surrounding the seed
+        sorted_dead_cell_list = [x for i, x in enumerate(dead_cell_list) if i == dead_cell_list.index(x)]
+
+        print('SEED {},{} has {} DEAD NEIGHBORS & SIZE of dead_cell_list: {}'.format(seed_row, seed_column,
+                                                                                     str(dead_neighbors),
+                                                                                     str(len(sorted_dead_cell_list))))
+    # List of surrounding dead cells (as CustomRect objects)
+    return sorted_dead_cell_list
+
+
+# Apply RULE 3 to list of seed cell in current turn
+def find_new_spawns():
+
+    list_of_dead_cells = get_dead_cells_list()
+
+   # for each dead cell in the list of surrounding neighbors
+    for dead_cell in list_of_dead_cells:
+
+        alive_neighbors = 0    # counter
+
+        surrounding_neighbor_cells = find_surrounding_cells(dead_cell)    # Returns list of all direct neighbors
+
+        dead_cell_row = find_on_grid(None, dead_cell.y)    # get the cell row index
+        dead_cell_column = find_on_grid(dead_cell.x, None)    # get the cell column index
+        print('FOR DEAD CELL {},{}'.format(dead_cell_row, dead_cell_column))
+
+        for cell_xy in surrounding_neighbor_cells:
+
+            column = find_on_grid(cell_xy.x, None)    # get the cell row index
+            row = find_on_grid(None, cell_xy.y)    # get the cell row index
+
+            # print(' CHECKING NEIGHBOR CELL {},{}'.format(row, column))
+
+            if cell_xy.get_state() == 1:
+
+                # print('NEIGHBOR CELL {},{} is ALIVE'.format(row, column))
+                alive_neighbors += 1
+
+        # print('NEIGHBOR CELL {},{} HAS {} LIVE NEIGHBORS'.format(row, column, alive_neighbors))
+
+        if alive_neighbors == 3:
+                # print('DEAD CELL {},{}, has 3 alive neighbors'.format(dead_cell_row, dead_cell_column))
+                new_spawn_cells.append(dead_cell)
+        else:
+            # print('DEAD CELL {},{} REMOVED FROM dead_cells list')
+            list_of_dead_cells.remove(dead_cell)
+
+    # print(' NEXT TURN {} NEW SPAWNS FORM'.format(str(len(new_spawn_cells))))
+    # print(' {} Remaining cells in the dead_cell_list'.format(str(len(dead_cell_list))))
+
+    for x in new_spawn_cells:
+        print(' SPAWN {} '.format(x))
+
+# Act of God' seed/alive cell state updated based on number of alive neighbors
+def act_of_god():
+
+    # print('NUMBER OF SEEDS {}'.format(len(seed_cell_list_current_turn)))
+
+    temp_list = []
+
+    # Apply Conway's Rules #1,2,3 to seed cells
+    for seed in seed_cell_list_current_turn:
+
+        alive_neighbors = 0    #
+
+        seed_row = find_on_grid(None,seed.y)
+        seed_column = find_on_grid(seed.x, None)
+
+        surrounding_neighbor_cells = find_surrounding_cells(seed)
+
+        # print('FOR SEED CELL {},{}'.format(seed_row, seed_column))
+
+        for cell_xy in surrounding_neighbor_cells:
+
+            column = find_on_grid(cell_xy.x, None)
+            row = find_on_grid(None, cell_xy.y)
+
+            # print(' CHECKING NEIGHBOR CELL {},{}'.format(row, column))
+
+            if cell_xy.get_state() == 1:
+                # print('NEIGHBOR CELL {},{} is ALIVE'.format(row, column))
+                alive_neighbors += 1  # Add 1
+
+        # print('SEED CELL {},{} HAS {} LIVE NEIGHBORS'.format(row, column, alive_neighbors))
+
+        # APPLY Rules
+        # Based on rules seeds marked to die are added to a temp list
+
+        # Any live cell with fewer than two live neighbours dies, as if caused by underpopulation.' - remove
+        # Any live cell with more than three live neighbours dies, as if by overpopulation. - remove
+        if (alive_neighbors < 2 or alive_neighbors > 3):
+            temp_list.append(seed)
+            # add cell to temp list
+
+        # Any live cell with two or three live neighbours lives on to the next generation. - pass
+        else:
+            pass
+
+
+
+    # duplicates from the list of cells marked for death are removed
+    #sorted_seed_cells_list = [x for i, x in enumerate(temp_list) if i == temp_list.index(x)]
+
+    # cell marked for death are removed from the seed_cell_list
+    for cell in temp_list:
+        if temp_list.__contains__(cell):
+            cell.set_state(0)
+            cell.update_state(WHITE, screen)
+            seed_cell_list_current_turn.remove(cell)
+            # print('BAM')
+
+   #  print(' {} REMAINING SEEDS'.format(str(len(seed_cell_list_current_turn))))
+
+
+#
+def update_screen():
+    # print('REMAINING SEEDS {}'.format(len(seed_cell_list)))
+
+    list_of_new_seeds = seed_cell_list_current_turn + new_spawn_cells
+
+    for cell in list_of_new_seeds:
+        cell.update_state(GREEN, screen)
+
+
+    print('NEW SPAWNS {}'.format(len(new_spawn_cells)))
+
+
+# CURRENTLY WORKING ON - HANDLES THE MAIN LOOP LOGIC
+def launch_sim():
+
+    generations = 0
+    finish = False
+    print('LAUNCHING GAME OF LIFE')
+
+    # LOOP 3. Iteratively for each seed cell, the surrounding dead and alive neighbors are determined, and based on
+    # those results, Conway's Rules are applied to the Seeds and the Dead cell surrounding the live.
+    while(start is True) and (finish is False):
+
+        if len(seed_cell_list_current_turn) == 0:
+            finish = True
+            # ?? does not seem required -- update_screen()
+            print('POPULATION LASTED {} generations'.format(generations))
+            print('GAME OVER')
+            break
+
+        print('Generation {}, seeds this turn {} ------ '.format(generations, len(seed_cell_list_current_turn)))
+
+        # dead_cells = get_dead_cells_list()
+
+        find_new_spawns()     # Applying Rule 3
+
+        act_of_god()    # Applying Rule 1,2,4
+
+        # scan through grid and update the color of grid based on states
+        update_screen()
+
+        pygame.display.flip()
+
+        generations += 1
+
+
+# INITIALIZE PyGAME VARIABLES
+grid = init_board()    # RETURNS ROW x COL 2D list array of game grid cells
+setup_interface()    # Loads GUI
+start = True
+done = False  # Used to start and stop main program loop
+SEEDS = 3   # Used to seed counter
+seed_cell_list_current_turn = []    # Seeds/live cell list (CustomRect objects/grid cells)
+seed_cell_list_next_turn = []    # Seeds/live cell list (CustomRect objects/grid cells)
+dead_cell_list = []    # dead neighbor cells  (CustomRect objects/grid cells)
+new_spawn_cells = []    # new seeds being born
+clock = pygame.time.Clock().tick(60)    # Used to manage how fast the screen updates, set to 60 FPS
+pygame.display.flip()    # Refreshes the screen display loading to show all GUI
+
+# REMOVE the while loop, add a turn button. Use to determine where errors arise with certain configurations and the end
+
+# ********************************************************************************************************************#
+# |                                                  MAIN PROGRAM LOOPS                                             | #
+# ******************************************************************************************************************* #
+
+# LOOP 1: User selects a SEED configuration of live cells by clicking on grid
+while not done:
+
+    # For every event performed by user( egmouse click, keyboard press etc.)
+    for event in pygame.event.get():
+
+        # CHECKS IF user wants to quit
+        if event.type == pygame.QUIT:    # If user clicked window close
+            pygame.quit()    # Exists game
+
+        # LISTENS for user mouse events
+        if event.type == pygame.MOUSEBUTTONDOWN:    # If user clicked the right mouse button
+
+            clicked_at = pygame.mouse.get_pos()
+            cursor_x = clicked_at[0]    # x window coordinate
+            cursor_y = clicked_at[1]    # y window coordinate
+
+            # CHECK IF mouse click was inside grid
+            if cursor_x >= 0 and cursor_y >= 0:
+                if cursor_x <= GRID_WIDTH and cursor_y <= GRID_HEIGHT:
+                    # print('CLICKED AT:{},{}'.format(cursor_x, cursor_y))
+
+                    # Get grid matrix indices of the cell clicked on
+                    row_index = find_on_grid(None, cursor_y)
+                    column_index = find_on_grid(cursor_x, None)
+
+                    # Retrieve the CustomRect object of the cell
+                    cell = grid[row_index][column_index]
+                    cell_coordinates = [find_on_grid(cell.x, None), find_on_grid(None , cell.y)]
+
+                    # Add the clicked on cell to list of seeds from which game will evolve
+                    # print('SEED CELL {},{} ADDED TO seed_cell_list'.format(cell_coordinates[0], cell_coordinates[1]))
+                    seed_cell_list_current_turn.append(cell)
+                    print('SEED CELL {},{} ADDED TO seed_cell_list'.format(row_index, column_index))
+
+                    # CHECK that the cell state=dead
+                    if cell.get_state() == 0:   # if cell is dead and now clicked on, set to alive
+
+                        cell.set_state(1)    # set cell state to alive = 1
+                        cell.update_state(GREEN, screen)    # change the cell color
+                        SEEDS -= 1    # update the seed cell count
+                        pygame.display.flip()    # refresh the window
+            else:
+                pass
+                print('outside screen. select ' + SEEDS + ' seed cells and hit run')
+
+        if SEEDS == 0:
+            done = True
+
+done = False
+
+# LOOP 2: LISTEN for user to hit RUN --> launch simulation based on seed config.
+while not done:
+    clicked_at = pygame.mouse.get_pos()
+    cursor_x = clicked_at[0]  # x window coordinate
+    cursor_y = clicked_at[1]  # y window coordinate
+
+    # EVENT HANDLING
+    for event in pygame.event.get():  # User did something
+
+        # CHECKS if user wants quits
+        if event.type == pygame.QUIT:
+            done = True
+
+        # LISTENS for mouse clicks
+        if event.type == pygame.MOUSEBUTTONDOWN:
+
+            # IF mouse click within run button bounds --> RUN Button Press
+            if cursor_x >= run_btn_x and cursor_y >= run_btn_y:
+                if cursor_x <= (run_btn_x + run_btn_width) and cursor_y <= (run_btn_y + run_btn_height):
+
+                    launch_sim()    # start Game Of Life simulation from current seed configuration
+
+# Be IDLE friendly. If you forget this line, the program will 'hang' on exit.
+pygame.quit()

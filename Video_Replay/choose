@@ -1,0 +1,18 @@
+import random as r
+
+movie_choces = {
+
+    "0": "Robinhood",
+    "1": "The Grinch",
+    "2": "The Beasts"
+}
+
+prompt = input("Hello, Please hit enter to choose movie./n. Ready? Y/N")
+
+if prompt == "Y":
+
+    choice = r.randint(0,2)
+    print(choice)
+    movie = movie_choces[str(choice)]
+
+    print (movie)
